@@ -1,0 +1,55 @@
+name: Build Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app for Windows
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.version || github.ref_name }}
+          releaseName: 'Nova Invoice Manager ${{ github.event.inputs.version || github.ref_name }}'
+          releaseBody: |
+            ## Nova Invoice Manager — Windows Installer
+
+            ### Install
+            1. Download `Nova.Invoice.Manager_x64_en-US.msi` below
+            2. Double-click to install
+            3. Launch from Start Menu
+
+            > Your data is stored locally on your computer — nothing is sent to any server.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: false
