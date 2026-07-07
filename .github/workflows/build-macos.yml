@@ -7,15 +7,25 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.1.0)'
+        description: 'Version tag (e.g. v1.0.0)'
         required: false
-        default: 'v1.1.0'
+        default: 'v0.2.0'
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runs-on: macos-latest
+          - target: x86_64-apple-darwin
+            runs-on: macos-13
+
+    runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,17 +38,18 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          key: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app for macOS (universal)
+      - name: Build Tauri app (${{ matrix.target }})
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,12 +61,13 @@ jobs:
             ## Nova Invoice Manager — macOS
 
             ### Install
-            1. Download `Nova.Invoice.Manager_universal.dmg` below
-            2. Open the DMG and drag the app to Applications
-            3. If macOS blocks the app on first launch: right-click the app → Open
+            - **Apple Silicon (M1/M2/M3/M4):** download `Nova.Invoice.Manager_*_aarch64.dmg`
+            - **Intel Mac:** download `Nova.Invoice.Manager_*_x64.dmg`
+            - Open the DMG and drag the app to Applications
+            - If macOS blocks the app on first launch: right-click → Open
 
             > Your data is stored locally on your Mac — nothing is sent to any server.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
-          args: --target universal-apple-darwin
+          args: --target ${{ matrix.target }}
