@@ -5,7 +5,7 @@
   "identifier": "co.otsi.nova-invoice-manager",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:5175",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
@@ -24,6 +24,14 @@
     ],
     "security": {
       "csp": "default-src 'self' tauri: asset: https://ssl.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' tauri: asset: data:; img-src 'self' tauri: asset: data: blob:; connect-src 'self' tauri: asset: blob: data:; worker-src blob:"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBOEZGMkE1QzEyM0NDQUUKUldTdXpDUEJwZktQcWplVXJ3b1gra21MZlVnbXRvTFQralluUFZzbm9sZndlbzIvQzR6MEZJYTcK",
+      "endpoints": [
+        "https://github.com/dnaEncoder/nova-service-invoice-manager/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {

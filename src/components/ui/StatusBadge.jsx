@@ -8,6 +8,7 @@ const STATUS_ICONS = {
   Paid: CheckCircle2,
   Overdue: AlertCircle,
   Voided: Ban,
+  Pending: Clock3,
 };
 
 export default function StatusBadge({ status }) {

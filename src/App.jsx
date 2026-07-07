@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { computeInvoiceStatus } from "./lib/calculations";
+import { todayISO } from "./lib/utils";
+import { ensureMonthlyExpenseInstances, currentMonth } from "./lib/expenseCalculations";
 import {
   STORAGE_KEY,
   loadState,
@@ -10,6 +12,8 @@ import {
   createBlankInvoiceStage,
   createBlankInvoice,
   createBlankPayment,
+  createBlankExpenseTemplate,
+  createBlankExpense,
   emptyServiceItem,
 } from "./lib/schema";
 
@@ -22,6 +26,8 @@ import InvoiceEditor from "./views/InvoiceEditor";
 const InvoicePreview = lazy(() => import("./views/InvoicePreview"));
 import BusinessSettings from "./views/BusinessSettings";
 import PaymentsView from "./views/PaymentsView";
+import ExpensesView from "./views/ExpensesView";
+import ConfirmDialog from "./components/ui/ConfirmDialog";
 import ReportsView from "./views/ReportsView";
 import SettingsView from "./views/SettingsView";
 import BillingSetupView from "./views/BillingSetupView";
@@ -36,11 +42,25 @@ export default function App() {
   const [invoiceQuery, setInvoiceQuery] = useState("");
   const [clientQuery, setClientQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [confirmState, setConfirmState] = useState(null); // { message, action } | null
 
+  // Tauri's webview doesn't reliably support native window.confirm() (especially
+  // WebView2 on Windows), so destructive actions route through this in-app dialog.
+  function confirmThen(message, action) {
+    setConfirmState({ message, action });
+  }
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
+
+  useEffect(() => {
+    if (view !== "expenses") return;
+    setData((prev) => {
+      const nextExpenses = ensureMonthlyExpenseInstances(prev.expenseTemplates, prev.expenses, currentMonth());
+      return nextExpenses === prev.expenses ? prev : { ...prev, expenses: nextExpenses };
+    });
+  }, [view]);
 
   const selectedClient = data.clients.find((c) => c.id === selectedClientId) || null;
   const selectedProject = data.projects.find((p) => p.id === selectedProjectId) || null;
@@ -102,24 +122,25 @@ export default function App() {
   }
 
   function deleteClient(id) {
-    if (!window.confirm("Delete this client, its projects, and all related invoices?")) return;
-    setData((prev) => {
-      const projectIds = prev.projects.filter((p) => p.clientId === id).map((p) => p.id);
-      const clients = prev.clients.filter((c) => c.id !== id);
-      const projects = prev.projects.filter((p) => p.clientId !== id);
-      const invoices = prev.invoices.filter((inv) => !projectIds.includes(inv.projectId));
-      const payments = prev.payments.filter((pay) => {
-        const inv = invoices.find((i) => i.id === pay.invoiceId);
-        return !!inv;
+    confirmThen("Delete this client, its projects, and all related invoices?", () => {
+      setData((prev) => {
+        const projectIds = prev.projects.filter((p) => p.clientId === id).map((p) => p.id);
+        const clients = prev.clients.filter((c) => c.id !== id);
+        const projects = prev.projects.filter((p) => p.clientId !== id);
+        const invoices = prev.invoices.filter((inv) => !projectIds.includes(inv.projectId));
+        const payments = prev.payments.filter((pay) => {
+          const inv = invoices.find((i) => i.id === pay.invoiceId);
+          return !!inv;
+        });
+        const billingModels = prev.billingModels.filter((bm) => !projectIds.includes(bm.projectId));
+        const invoiceStages = prev.invoiceStages.filter((s) => !projectIds.includes(s.projectId));
+        const nextClientId = clients[0]?.id || null;
+        const nextProjectId = projects.find((p) => p.clientId === nextClientId)?.id || null;
+        setSelectedClientId(nextClientId);
+        setSelectedProjectId(nextProjectId);
+        setSelectedInvoiceId(invoices[0]?.id || null);
+        return { ...prev, clients, projects, invoices, payments, billingModels, invoiceStages };
       });
-      const billingModels = prev.billingModels.filter((bm) => !projectIds.includes(bm.projectId));
-      const invoiceStages = prev.invoiceStages.filter((s) => !projectIds.includes(s.projectId));
-      const nextClientId = clients[0]?.id || null;
-      const nextProjectId = projects.find((p) => p.clientId === nextClientId)?.id || null;
-      setSelectedClientId(nextClientId);
-      setSelectedProjectId(nextProjectId);
-      setSelectedInvoiceId(invoices[0]?.id || null);
-      return { ...prev, clients, projects, invoices, payments, billingModels, invoiceStages };
     });
   }
 
@@ -144,21 +165,22 @@ export default function App() {
   }
 
   function deleteProject(id) {
-    if (!window.confirm("Delete this project and all invoices under it?")) return;
-    setData((prev) => {
-      const projects = prev.projects.filter((p) => p.id !== id);
-      const deletedInvoiceIds = prev.invoices
-        .filter((inv) => inv.projectId === id)
-        .map((inv) => inv.id);
-      const invoices = prev.invoices.filter((inv) => inv.projectId !== id);
-      const payments = prev.payments.filter((pay) => !deletedInvoiceIds.includes(pay.invoiceId));
-      const billingModels = prev.billingModels.filter((bm) => bm.projectId !== id);
-      const invoiceStages = prev.invoiceStages.filter((s) => s.projectId !== id);
-      const nextProjectId =
-        projects.find((p) => p.clientId === selectedClientId)?.id || projects[0]?.id || null;
-      setSelectedProjectId(nextProjectId);
-      setSelectedInvoiceId(invoices[0]?.id || null);
-      return { ...prev, projects, invoices, payments, billingModels, invoiceStages };
+    confirmThen("Delete this project and all invoices under it?", () => {
+      setData((prev) => {
+        const projects = prev.projects.filter((p) => p.id !== id);
+        const deletedInvoiceIds = prev.invoices
+          .filter((inv) => inv.projectId === id)
+          .map((inv) => inv.id);
+        const invoices = prev.invoices.filter((inv) => inv.projectId !== id);
+        const payments = prev.payments.filter((pay) => !deletedInvoiceIds.includes(pay.invoiceId));
+        const billingModels = prev.billingModels.filter((bm) => bm.projectId !== id);
+        const invoiceStages = prev.invoiceStages.filter((s) => s.projectId !== id);
+        const nextProjectId =
+          projects.find((p) => p.clientId === selectedClientId)?.id || projects[0]?.id || null;
+        setSelectedProjectId(nextProjectId);
+        setSelectedInvoiceId(invoices[0]?.id || null);
+        return { ...prev, projects, invoices, payments, billingModels, invoiceStages };
+      });
     });
   }
 
@@ -205,12 +227,14 @@ export default function App() {
   }
 
   function voidInvoice(id) {
-    setData((prev) => ({
-      ...prev,
-      invoices: prev.invoices.map((inv) =>
-        inv.id === id ? { ...inv, voidedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : inv
-      ),
-    }));
+    confirmThen("Void this invoice? It will be marked as void and excluded from financial totals.", () => {
+      setData((prev) => ({
+        ...prev,
+        invoices: prev.invoices.map((inv) =>
+          inv.id === id ? { ...inv, voidedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : inv
+        ),
+      }));
+    });
   }
 
   // ── Service items ─────────────────────────────────────────────────────────────
@@ -272,10 +296,12 @@ export default function App() {
   }
 
   function deletePayment(paymentId) {
-    setData((prev) => ({
-      ...prev,
-      payments: prev.payments.filter((p) => p.id !== paymentId),
-    }));
+    confirmThen("Delete this payment entry?", () => {
+      setData((prev) => ({
+        ...prev,
+        payments: prev.payments.filter((p) => p.id !== paymentId),
+      }));
+    });
   }
 
   // ── Billing models ────────────────────────────────────────────────────────────
@@ -360,6 +386,84 @@ export default function App() {
     setView("editor");
   }
 
+  // ── Expense templates (fixed/recurring) ─────────────────────────────────────
+
+  function addExpenseTemplate(templateData = {}) {
+    const template = { ...createBlankExpenseTemplate(), ...templateData };
+    setData((prev) => {
+      const expenseTemplates = [template, ...prev.expenseTemplates];
+      const expenses = ensureMonthlyExpenseInstances(expenseTemplates, prev.expenses, currentMonth());
+      return { ...prev, expenseTemplates, expenses };
+    });
+  }
+
+  function updateExpenseTemplate(id, patch) {
+    setData((prev) => ({
+      ...prev,
+      expenseTemplates: prev.expenseTemplates.map((t) =>
+        t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t
+      ),
+    }));
+  }
+
+  function deleteExpenseTemplate(id) {
+    confirmThen(
+      "Deactivate this fixed expense? Past entries are kept, but no new monthly entries will be created.",
+      () => {
+        setData((prev) => ({
+          ...prev,
+          expenseTemplates: prev.expenseTemplates.map((t) =>
+            t.id === id ? { ...t, active: false, updatedAt: new Date().toISOString() } : t
+          ),
+        }));
+      }
+    );
+  }
+
+  // ── Expenses (ledger rows: variable one-offs + generated fixed instances) ───
+
+  function addExpense(month, expenseData = {}) {
+    const expense = { ...createBlankExpense(month, null), ...expenseData };
+    setData((prev) => ({ ...prev, expenses: [expense, ...prev.expenses] }));
+  }
+
+  function updateExpense(id, patch) {
+    setData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) =>
+        e.id === id ? { ...e, ...patch, updatedAt: new Date().toISOString() } : e
+      ),
+    }));
+  }
+
+  function deleteExpense(id) {
+    confirmThen("Delete this expense entry?", () => {
+      setData((prev) => ({ ...prev, expenses: prev.expenses.filter((e) => e.id !== id) }));
+    });
+  }
+
+  function markExpensePaid(id, paidDate = todayISO()) {
+    setData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) =>
+        e.id === id
+          ? { ...e, status: "Paid", paidDate, paidAmount: e.amount, updatedAt: new Date().toISOString() }
+          : e
+      ),
+    }));
+  }
+
+  function markExpenseUnpaid(id) {
+    setData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) =>
+        e.id === id
+          ? { ...e, status: "Pending", paidDate: "", paidAmount: 0, updatedAt: new Date().toISOString() }
+          : e
+      ),
+    }));
+  }
+
   // ── Navigation helpers ────────────────────────────────────────────────────────
 
   function openPreview(invoice) {
@@ -370,13 +474,14 @@ export default function App() {
   }
 
   function resetDemoData() {
-    if (!window.confirm("Reset all local data and reload sample data?")) return;
-    const sample = createSampleData();
-    setData(sample);
-    setSelectedClientId(sample.clients[0]?.id || null);
-    setSelectedProjectId(sample.projects[0]?.id || null);
-    setSelectedInvoiceId(sample.invoices[0]?.id || null);
-    setView("dashboard");
+    confirmThen("Reset all local data and reload sample data?", () => {
+      const sample = createSampleData();
+      setData(sample);
+      setSelectedClientId(sample.clients[0]?.id || null);
+      setSelectedProjectId(sample.projects[0]?.id || null);
+      setSelectedInvoiceId(sample.invoices[0]?.id || null);
+      setView("dashboard");
+    });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -463,6 +568,20 @@ export default function App() {
 
           {view === "payments" && <PaymentsView data={data} deletePayment={deletePayment} />}
 
+          {view === "expenses" && (
+            <ExpensesView
+              data={data}
+              addExpenseTemplate={addExpenseTemplate}
+              updateExpenseTemplate={updateExpenseTemplate}
+              deleteExpenseTemplate={deleteExpenseTemplate}
+              addExpense={addExpense}
+              updateExpense={updateExpense}
+              deleteExpense={deleteExpense}
+              markExpensePaid={markExpensePaid}
+              markExpenseUnpaid={markExpenseUnpaid}
+            />
+          )}
+
           {view === "business" && (
             <BusinessSettings business={data.business} updateBusiness={updateBusiness} />
           )}
@@ -524,6 +643,17 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {confirmState && (
+        <ConfirmDialog
+          message={confirmState.message}
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => {
+            confirmState.action();
+            setConfirmState(null);
+          }}
+        />
+      )}
     </div>
   );
 }

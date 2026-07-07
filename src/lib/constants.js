@@ -30,4 +30,20 @@ export const STATUS_STYLES = {
   Ready: "bg-emerald-100 text-emerald-700",
   Locked: "bg-rose-100 text-rose-700",
   Generated: "bg-blue-100 text-blue-700",
+  Pending: "bg-amber-100 text-amber-800",
 };
+
+export const EXPENSE_CATEGORIES = [
+  "Rent",
+  "Salaries",
+  "Subscriptions",
+  "Utilities",
+  "Software & Tools",
+  "Marketing",
+  "Travel",
+  "Office Supplies",
+  "Professional Fees",
+  "Other",
+];
+
+export const EXPENSE_STATUSES = ["Pending", "Paid"];

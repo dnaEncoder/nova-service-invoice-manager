@@ -151,6 +151,39 @@ export function createBlankPayment(invoiceId) {
   };
 }
 
+// ── Expenses ────────────────────────────────────────────────────────────────
+
+export function createBlankExpenseTemplate() {
+  return {
+    id: uid(),
+    name: "New Fixed Expense",
+    category: "Other",
+    amount: 0,
+    active: true,
+    startMonth: todayISO().slice(0, 7), // "YYYY-MM"
+    notes: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function createBlankExpense(month = todayISO().slice(0, 7), templateId = null) {
+  return {
+    id: uid(),
+    templateId, // null = variable one-off; set = auto-generated fixed instance
+    name: "New Expense",
+    category: "Other",
+    amount: 0,
+    month, // "YYYY-MM" — the obligation's month, permanent once created
+    status: "Pending", // "Pending" | "Paid"
+    paidDate: "",
+    paidAmount: 0, // snapshot at the moment of marking paid
+    notes: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 // ── Sample data ───────────────────────────────────────────────────────────────
 
 export function createSampleData() {
@@ -302,6 +335,8 @@ export function createSampleData() {
         actor: "Nova Studios",
       },
     ],
+    expenseTemplates: [],
+    expenses: [],
   };
 }
 
@@ -311,7 +346,13 @@ function migrateData(raw) {
   if (!raw?.clients || !raw?.projects || !raw?.invoices) return null;
 
   const version = raw.version || 1;
-  if (version === CURRENT_VERSION) return raw;
+  if (version === CURRENT_VERSION) {
+    return {
+      ...raw,
+      expenseTemplates: raw.expenseTemplates || [],
+      expenses: raw.expenses || [],
+    };
+  }
 
   // v1 → v2: add new fields to existing records, add missing entity arrays
   const migratedPayments = raw.payments || [];
@@ -362,6 +403,8 @@ function migrateData(raw) {
     invoiceStages: raw.invoiceStages || [],
     payments: migratedPayments,
     activityLogs: raw.activityLogs || [],
+    expenseTemplates: raw.expenseTemplates || [],
+    expenses: raw.expenses || [],
   };
 }
 

@@ -296,7 +296,6 @@ export default function InvoiceEditor({
   }
 
   function handleVoid() {
-    if (!window.confirm("Void this invoice? It will be marked as void and excluded from financial totals.")) return;
     voidInvoice(invoice.id);
   }
 
@@ -482,9 +481,7 @@ export default function InvoiceEditor({
           </div>
           <PaymentHistory
             invoicePayments={invoicePayments}
-            onDelete={(paymentId) => {
-              if (window.confirm("Remove this payment entry?")) deletePayment(paymentId);
-            }}
+            onDelete={(paymentId) => deletePayment(paymentId)}
           />
 
           {/* Void invoice danger zone */}

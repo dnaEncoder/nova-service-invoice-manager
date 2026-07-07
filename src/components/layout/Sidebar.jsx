@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BarChart3,
   Building2,
   FileText,
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { id: "clients", icon: Users, label: "Clients" },
   { id: "invoices", icon: FileText, label: "Invoices" },
   { id: "payments", icon: WalletCards, label: "Payments" },
+  { id: "expenses", icon: Banknote, label: "Expenses" },
   { id: "business", icon: Building2, label: "Business Details" },
   { id: "reports", icon: BarChart3, label: "Reports" },
   { id: "settings", icon: Settings, label: "Settings" },

@@ -129,9 +129,7 @@ export default function PaymentsView({ data, deletePayment }) {
                         <td className="px-4 py-4 text-right">
                           {deletePayment && (
                             <button
-                              onClick={() => {
-                                if (window.confirm("Delete this payment entry?")) deletePayment(payment.id);
-                              }}
+                              onClick={() => deletePayment(payment.id)}
                               className="rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100"
                               title="Delete payment"
                             >
