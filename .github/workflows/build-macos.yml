@@ -1,4 +1,4 @@
-name: Build Windows Installer
+name: Build macOS App
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.0.0)'
+        description: 'Version tag (e.g. v1.1.0)'
         required: false
-        default: 'v1.0.0'
+        default: 'v1.1.0'
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build-macos:
+    runs-on: macos-latest
     permissions:
       contents: write
     steps:
@@ -27,6 +27,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -36,7 +38,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app for Windows
+      - name: Build Tauri app for macOS (universal)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,14 +47,15 @@ jobs:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
           releaseName: 'Nova Invoice Manager ${{ github.event.inputs.version || github.ref_name }}'
           releaseBody: |
-            ## Nova Invoice Manager — Windows Installer
+            ## Nova Invoice Manager — macOS
 
             ### Install
-            1. Download `Nova.Invoice.Manager_x64_en-US.msi` below
-            2. Double-click to install
-            3. Launch from Start Menu
+            1. Download `Nova.Invoice.Manager_universal.dmg` below
+            2. Open the DMG and drag the app to Applications
+            3. If macOS blocks the app on first launch: right-click the app → Open
 
-            > Your data is stored locally on your computer — nothing is sent to any server.
+            > Your data is stored locally on your Mac — nothing is sent to any server.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+          args: --target universal-apple-darwin
