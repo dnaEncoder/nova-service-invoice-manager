@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, GitBranch, Lock, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, GitBranch, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { getProjectSummary, calculateInvoice, computeInvoiceStatus, evaluateStageStatus } from "../lib/calculations";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, todayISO } from "../lib/utils";
 import { STATUS_STYLES } from "../lib/constants";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
@@ -16,6 +16,7 @@ export default function ProjectDetailView({
   deleteProject,
   addInvoice,
   openPreview,
+  onOpenEditor,
   onBillingSetup,
   onBack,
 }) {
@@ -44,7 +45,23 @@ export default function ProjectDetailView({
           <ArrowLeft size={15} />
           {client?.name || "Clients"}
         </button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {project.status === "Active" && (
+            <button
+              onClick={() => updateProject(project.id, { status: "Delivered", deliveryDate: todayISO() })}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <CheckCircle2 size={15} /> Mark as Delivered
+            </button>
+          )}
+          {project.status === "Delivered" && (
+            <button
+              onClick={() => updateProject(project.id, { status: "Completed" })}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+            >
+              <CheckCircle2 size={15} /> Mark as Completed
+            </button>
+          )}
           <button
             onClick={() => onBillingSetup(project)}
             className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
@@ -208,12 +225,24 @@ export default function ProjectDetailView({
                     <td className="px-4 py-3.5 text-right font-bold">{formatCurrency(totals.total)}</td>
                     <td className="px-4 py-3.5 text-right text-slate-500">{formatCurrency(totals.paid)}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <button
-                        onClick={() => openPreview(invoice)}
-                        className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
-                      >
-                        <Eye size={13} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {onOpenEditor && (
+                          <button
+                            onClick={() => onOpenEditor(invoice)}
+                            className="rounded-xl bg-blue-50 p-2 text-blue-600 hover:bg-blue-100"
+                            title="Open editor / record payment"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openPreview(invoice)}
+                          className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                          title="Preview"
+                        >
+                          <Eye size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

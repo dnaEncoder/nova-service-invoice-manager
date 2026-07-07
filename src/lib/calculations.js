@@ -3,7 +3,16 @@ import { safeNumber, todayISO } from "./utils";
 // Evaluates a stage's effective status from its unlock rule and current data.
 // Only overrides if the stage is still in a mutable state (not Generated/Paid).
 export function evaluateStageStatus(stage, allStages, allInvoices, allPayments, allProjects) {
-  if (stage.stageStatus === "Generated" || stage.stageStatus === "Paid") return stage.stageStatus;
+  if (stage.stageStatus === "Paid") return "Paid";
+
+  // Dynamically promote Generated → Paid when the linked invoice is fully paid
+  if (stage.stageStatus === "Generated") {
+    if (stage.invoiceId) {
+      const inv = allInvoices.find((i) => i.id === stage.invoiceId);
+      if (inv && computeInvoiceStatus(inv, allPayments) === "Paid") return "Paid";
+    }
+    return "Generated";
+  }
 
   switch (stage.unlockRule) {
     case "immediate":

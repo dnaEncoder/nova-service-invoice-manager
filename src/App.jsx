@@ -288,19 +288,41 @@ export default function App() {
   // ── Payments ──────────────────────────────────────────────────────────────────
 
   function addPayment(invoiceId, paymentData) {
-    const payment = {
-      ...createBlankPayment(invoiceId),
-      ...paymentData,
-    };
-    setData((prev) => ({ ...prev, payments: [...prev.payments, payment] }));
+    const payment = { ...createBlankPayment(invoiceId), ...paymentData };
+    setData((prev) => {
+      const payments = [...prev.payments, payment];
+      const invoice = prev.invoices.find((inv) => inv.id === invoiceId);
+      const nowPaid = invoice && computeInvoiceStatus(invoice, payments) === "Paid";
+      const invoiceStages = nowPaid
+        ? prev.invoiceStages.map((s) =>
+            s.invoiceId === invoiceId && s.stageStatus === "Generated"
+              ? { ...s, stageStatus: "Paid", updatedAt: new Date().toISOString() }
+              : s
+          )
+        : prev.invoiceStages;
+      return { ...prev, payments, invoiceStages };
+    });
   }
 
   function deletePayment(paymentId) {
     confirmThen("Delete this payment entry?", () => {
-      setData((prev) => ({
-        ...prev,
-        payments: prev.payments.filter((p) => p.id !== paymentId),
-      }));
+      setData((prev) => {
+        const deleted = prev.payments.find((p) => p.id === paymentId);
+        const payments = prev.payments.filter((p) => p.id !== paymentId);
+        let invoiceStages = prev.invoiceStages;
+        if (deleted) {
+          const invoice = prev.invoices.find((inv) => inv.id === deleted.invoiceId);
+          const stillPaid = invoice && computeInvoiceStatus(invoice, payments) === "Paid";
+          if (!stillPaid) {
+            invoiceStages = prev.invoiceStages.map((s) =>
+              s.invoiceId === deleted.invoiceId && s.stageStatus === "Paid"
+                ? { ...s, stageStatus: "Generated", updatedAt: new Date().toISOString() }
+                : s
+            );
+          }
+        }
+        return { ...prev, payments, invoiceStages };
+      });
     });
   }
 
@@ -543,6 +565,13 @@ export default function App() {
               deleteProject={(id) => { deleteProject(id); setView("clients"); }}
               addInvoice={(cid, pid, stageId) => addInvoice(cid, pid, stageId, "projectDetail")}
               openPreview={openPreview}
+              onOpenEditor={(invoice) => {
+                setSelectedClientId(invoice.clientId);
+                setSelectedProjectId(invoice.projectId);
+                setSelectedInvoiceId(invoice.id);
+                setPrevView("projectDetail");
+                setView("editor");
+              }}
               onBillingSetup={(project) => {
                 setSelectedClientId(project.clientId);
                 setSelectedProjectId(project.id);
