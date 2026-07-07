@@ -9,20 +9,12 @@ on:
       version:
         description: 'Version tag (e.g. v1.0.0)'
         required: false
-        default: 'v0.2.0'
+        default: 'v0.3.0'
 
 jobs:
   build-macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runs-on: macos-latest
-          - target: x86_64-apple-darwin
-            runs-on: macos-13
+    runs-on: macos-latest
 
-    runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: write
 
@@ -38,18 +30,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
-          key: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app (${{ matrix.target }})
+      - name: Build Tauri app (Apple Silicon)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,11 +49,10 @@ jobs:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
           releaseName: 'Nova Invoice Manager ${{ github.event.inputs.version || github.ref_name }}'
           releaseBody: |
-            ## Nova Invoice Manager — macOS
+            ## Nova Invoice Manager — macOS (Apple Silicon)
 
             ### Install
-            - **Apple Silicon (M1/M2/M3/M4):** download `Nova.Invoice.Manager_*_aarch64.dmg`
-            - **Intel Mac:** download `Nova.Invoice.Manager_*_x64.dmg`
+            - Download `Nova.Invoice.Manager_*_aarch64.dmg`
             - Open the DMG and drag the app to Applications
             - If macOS blocks the app on first launch: right-click → Open
 
@@ -70,4 +60,4 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
-          args: --target ${{ matrix.target }}
+          args: --target aarch64-apple-darwin
